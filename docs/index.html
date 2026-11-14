@@ -63,6 +63,14 @@ a{color:var(--paper)}
 .bridge .pair{display:flex;align-items:center;gap:6px}
 .bridge .pair b{font-weight:500;margin-left:auto;font-family:"IBM Plex Mono",monospace}
 .bridge .eg{color:var(--dust);margin-top:3px}
+.form label{display:block;font-size:12px;color:var(--dust);margin:10px 0 4px}
+.form select,.form input{width:100%;background:var(--soil);border:1px solid var(--rule);color:var(--paper);padding:7px 9px;font:inherit;border-radius:3px}
+.form select:focus,.form input:focus{outline:1px solid var(--ember)}
+.btn{display:inline-block;margin-top:12px;background:var(--ember);color:var(--soil);border:0;padding:8px 14px;font:500 14px "IBM Plex Sans",sans-serif;border-radius:3px;cursor:pointer;text-decoration:none}
+.btn:disabled{opacity:.4;cursor:default}
+.sug{padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.sug .votes{float:right;font-family:"IBM Plex Mono",monospace;color:var(--dust)}
+.sug a{color:var(--dust)}
 @media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:60vh auto}aside{border-left:0;border-top:1px solid var(--rule)}#stage-title h1{font-size:34px}}
 </style>
 </head>
@@ -82,9 +90,23 @@ a{color:var(--paper)}
     <div id="langs"></div>
 
     <h2>Find a concept</h2>
-    <input id="search" list="concept-list" placeholder="water, hand, sick, mother" autocomplete="off">
+    <input id="search" list="concept-list" placeholder="water, mother, or a word like yaku" autocomplete="off">
     <datalist id="concept-list"></datalist>
     <div id="detail"><p class="empty">Click a concept in the map or search for one.</p></div>
+
+    <h2>Help improve it</h2>
+    <p class="empty" style="margin:0;font-size:13px">Speak one of these languages? Link a word to a concept. Suggestions are voted on in public, and approved words join the map.</p>
+    <div class="form">
+      <label for="s-lang">Language</label>
+      <select id="s-lang"></select>
+      <label for="s-concept">Concept or English meaning</label>
+      <input id="s-concept" list="concept-list" placeholder="water" autocomplete="off">
+      <label for="s-word">Word in the language</label>
+      <input id="s-word" placeholder="type the word" autocomplete="off">
+      <button class="btn" id="s-go" disabled>Suggest on GitHub</button>
+    </div>
+    <p class="empty" style="font-size:12px;margin:8px 0 0">Opens a public GitHub issue. You need a free GitHub account.</p>
+    <div id="review"></div>
 
     <h2>Where languages meet</h2>
     <p class="empty" style="margin:0 0 6px;font-size:13px">Concepts both languages have a word for, so each word can be traced to the other through meaning.</p>
@@ -143,7 +165,7 @@ function start(data){
     .width(el.clientWidth).height(el.clientHeight)
     .nodeId('id')
     .nodeVal(n => n.kind === 'field' ? 14 : n.kind === 'concept' ? (wordsOf[n.id] ? 2.4 : 1) : 1 + Math.min(n.evidence || 0, 6) * 0.25)
-    .nodeColor(n => n.kind === 'field' ? getVar('--paper') : n.kind === 'concept' ? (lit(n) ? getVar('--ember') : getVar('--unlit')) : COLORS[n.lang])
+    .nodeColor(n => n.kind === 'field' ? getVar('--paper') : n.kind === 'concept' ? (lit(n) ? getVar('--ember') : getVar('--unlit')) : n.community ? getVar('--paper') : COLORS[n.lang])
     .nodeOpacity(0.92)
     .nodeLabel(n => n.kind === 'word' ? `${esc(n.label)} · ${esc(n.meaning)} (${esc(L[n.lang].name)})` : esc(n.label))
     .linkColor(l => l.kind === 'colex' ? COLORS[l.lang] : l.kind === 'means' ? COLORS[nodeOf(l.source).lang] : getVar('--rule'))
@@ -207,7 +229,7 @@ function start(data){
     const ws = (wordsOf[c.id] || []).filter(w => active.has(w.lang));
     const colex = data.links.filter(l => l.kind === 'colex' && active.has(l.lang) && (idOf(l.source) === c.id || idOf(l.target) === c.id));
     det.innerHTML = `<p style="margin:0 0 6px"><span style="font:400 22px 'Instrument Serif',serif">${esc(c.label)}</span> <span class="mono" style="color:var(--dust)">Concepticon ${esc(c.cid)} · ${esc(c.field)}</span></p>` +
-      (ws.length ? ws.map(w => `<div class="word"><span class="sw" style="background:${COLORS[w.lang]};margin-top:5px"></span><span class="mono">${esc(w.label)}</span><span>${esc(L[w.lang].name)}, ${w.evidence} example${w.evidence === 1 ? '' : 's'}</span></div>`).join('')
+      (ws.length ? ws.map(w => `<div class="word"><span class="sw" style="background:${COLORS[w.lang]};margin-top:5px"></span><span class="mono">${esc(w.label)}</span><span>${esc(L[w.lang].name)}, ${w.community ? 'added by the community' : w.evidence + ' example' + (w.evidence === 1 ? '' : 's')}</span></div>`).join('')
                  : '<p class="empty">No language has a word for this yet. It is a gap to fill with more examples.</p>') +
       colex.map(l => { const o = nodeOf(idOf(l.source) === c.id ? l.target : l.source); return `<p class="empty" style="margin:8px 0 0;font-size:13px">${esc(L[l.lang].name)} uses <span class="mono">${esc(l.form)}</span> for both ${esc(c.label)} and ${esc(o.label)}.</p>`; }).join('');
   }
@@ -215,11 +237,55 @@ function start(data){
   // search
   const dl = document.getElementById('concept-list');
   const concepts = data.nodes.filter(n => n.kind === 'concept');
-  dl.innerHTML = concepts.map(c => `<option value="${esc(c.label)}">`).join('');
+  const allWords = data.nodes.filter(n => n.kind === 'word');
+  dl.innerHTML = concepts.map(c => `<option value="${esc(c.label)}">`).join('') + allWords.map(w => `<option value="${esc(w.label)}">${esc(L[w.lang].name)}</option>`).join('');
   document.getElementById('search').addEventListener('change', e => {
-    const c = concepts.find(x => x.label === e.target.value.trim().toLowerCase());
+    const v = e.target.value.trim().toLowerCase();
+    let c = concepts.find(x => x.label === v);
+    if (!c) { const w = data.nodes.find(n => n.kind === 'word' && n.label.toLowerCase() === v); const l = w && data.links.find(l => l.kind === 'means' && idOf(l.source) === w.id); if (l) c = nodeOf(l.target); }
     if (c) { show(c); focus(c); }
   });
+
+  // community: suggest, review, approved words
+  const REPO = 'h-ardy/rosetta';
+  const sl = document.getElementById('s-lang'), sc = document.getElementById('s-concept'), sw = document.getElementById('s-word'), go = document.getElementById('s-go');
+  sl.innerHTML = Object.values(L).map(v => `<option>${esc(v.name)}</option>`).join('') + '<option>Other (name it in the notes)</option>';
+  const ready = () => { go.disabled = !(sc.value.trim() && sw.value.trim()); };
+  sc.addEventListener('input', ready); sw.addEventListener('input', ready);
+  go.addEventListener('click', () => {
+    const q = new URLSearchParams({template: 'word.yml', title: `[word] ${sc.value.trim()}: ${sw.value.trim()} (${sl.value})`,
+      language: sl.value, concept: sc.value.trim(), word: sw.value.trim()});
+    window.open(`https://github.com/${REPO}/issues/new?${q}`, '_blank', 'noopener');
+  });
+  const field = (body, name) => { const m = (body || '').match(new RegExp('### ' + name + '\\s+([^\\n]+)')); return m && m[1].trim() !== '_No response_' ? m[1].trim() : ''; };
+  const langKey = name => Object.keys(L).find(k => L[k].name === name);
+  const conceptFor = text => { const t = (text || '').trim().toLowerCase(); return concepts.find(c => c.label === t) || concepts.find(c => c.label.split(/[ (]/)[0] === t); };
+  fetch(`https://api.github.com/repos/${REPO}/issues?labels=suggestion&state=all&per_page=100`)
+    .then(r => r.ok ? r.json() : [])
+    .then(items => {
+      const rows = items.filter(i => !i.pull_request).map(i => ({
+        url: i.html_url, state: i.state, labels: (i.labels || []).map(l => l.name),
+        lang: field(i.body, 'Language'), concept: field(i.body, 'Concept or English meaning'), word: field(i.body, 'Word in the language'),
+        up: (i.reactions || {})['+1'] || 0, down: (i.reactions || {})['-1'] || 0 }));
+      const approved = rows.filter(r => r.labels.includes('approved'));
+      const open = rows.filter(r => r.state === 'open' && !r.labels.includes('approved'));
+      let added = 0;
+      for (const r of approved) {
+        const k = langKey(r.lang), c = conceptFor(r.concept);
+        if (!k || !c || !r.word) continue;
+        const id = `w:${k}:${r.word}:community`;
+        if (byId[id]) continue;
+        const n = {id, kind: 'word', lang: k, label: r.word, meaning: r.concept, evidence: 0, community: true};
+        data.nodes.push(n); byId[id] = n; data.links.push({source: id, target: c.id, kind: 'means'});
+        (wordsOf[c.id] ||= []).push(n); added++;
+      }
+      if (added) refresh();
+      document.getElementById('review').innerHTML =
+        `<p class="empty" style="font-size:13px;margin:14px 0 4px">${approved.length} approved by the community, ${open.length} in review.</p>` +
+        open.sort((a, b) => (b.up - b.down) - (a.up - a.down)).slice(0, 8).map(r =>
+          `<div class="sug"><span class="votes">+${r.up} / -${r.down}</span><span class="mono">${esc(r.word)}</span> = ${esc(r.concept)} <span style="color:var(--dust)">(${esc(r.lang)})</span><br><a href="${esc(r.url)}" target="_blank" rel="noopener">Vote on GitHub</a></div>`).join('');
+    })
+    .catch(() => {});
 
   // where languages meet: concepts with words in two languages
   const keys = Object.keys(L), bridges = [];

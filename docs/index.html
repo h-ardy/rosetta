@@ -82,6 +82,12 @@ th.num{text-align:right;white-space:nowrap}
 .empty{color:var(--dust)}
 footer{color:var(--dust);font-size:12px;margin-top:28px;border-top:1px solid var(--rule);padding-top:12px}
 a{color:var(--paper)}
+#mode{position:absolute;z-index:3;left:28px;top:16px;display:flex;gap:18px}
+#mode button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dust);font:400 20px/1 "Instrument Serif",serif;padding:2px 0 6px;cursor:pointer}
+#mode button.on{color:var(--paper);border-bottom-color:var(--ember)}
+.fact{padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.fact .src{color:var(--dust);font-size:11.5px;margin-top:3px}
+.gnote{font-size:13px;color:var(--dust);margin:8px 0 0}
 #labels{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}
 #labels span{position:absolute;transform:translate(-50%,-140%);font:12px/1 "IBM Plex Sans",sans-serif;color:var(--paper);white-space:nowrap;text-shadow:0 0 4px var(--soil),0 0 2px var(--soil)}
 #labels span.field{font:italic 400 17px/1 "Instrument Serif",serif;color:var(--dust)}
@@ -122,6 +128,7 @@ a{color:var(--paper)}
   </div>
   <section id="graph" aria-label="3D map of concepts and the words each language learned">
     <div id="canvas"></div>
+    <div id="mode" role="group" aria-label="Map"><button class="on" data-mode="meaning" aria-pressed="true">Meaning</button><button data-mode="grammar" aria-pressed="false">Grammar</button></div>
     <div id="labels"></div>
     <div id="stage-note">Drag to turn, scroll to zoom, click a concept to see every word attached to it. Large pale nodes are topics, small nodes are concepts, colored nodes are words learned from 200 example sentences.</div>
   </section>
@@ -144,8 +151,14 @@ a{color:var(--paper)}
     <p class="empty" style="margin:0 0 6px;font-size:13px">Concepts both languages have a word for, so each word can be traced to the other through meaning.</p>
     <div id="bridges"></div>
 
+    <h2>What the grammar shares</h2>
+    <p class="empty" style="margin:0 0 6px;font-size:13px">The meaning map links words. The grammar map links the pieces of words that do the same job, like marking the object of a verb or saying how the speaker knows something.</p>
+    <div id="facts"></div>
+    <table id="gtable" style="margin-top:10px"></table>
+    <p class="gnote" id="gmethod"></p>
+
     <h2>How well it translates</h2>
-    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100.</p>
+    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100. Zero: no examples. Few-shot: the 200 examples pasted into the prompt. Rosetta: only the dictionary it learned. Cipher: Rosetta on Quechua with every letter swapped.</p>
     <table id="results"></table>
 
     <h2>Coverage by topic</h2>
@@ -210,22 +223,46 @@ function start(data){
     .backgroundColor(getVar('--soil'))
     .width(el.clientWidth).height(el.clientHeight)
     .nodeId('id')
-    .nodeVal(n => n.kind === 'field' ? 14 : n.kind === 'concept' ? (wordsOf[n.id] ? 2.4 : 1) : 1 + Math.min(n.evidence || 0, 6) * 0.25)
-    .nodeColor(n => n.kind === 'field' ? getVar('--paper') : n.kind === 'concept' ? (lit(n) ? getVar('--ember') : getVar('--unlit')) : n.community ? getVar('--paper') : COLORS[n.lang])
+    .nodeVal(n => n.kind === 'lhub' ? 12 : n.kind === 'gfunc' ? (shared(n) ? 7 : 4) : n.kind === 'morph' ? 1 + Math.min(n.evidence || 0, 8) * 0.3 : n.kind === 'field' ? 14 : n.kind === 'concept' ? (wordsOf[n.id] ? 2.4 : 1) : 1 + Math.min(n.evidence || 0, 6) * 0.25)
+    .nodeColor(n => n.kind === 'lhub' ? COLORS[n.lang] : n.kind === 'gfunc' ? (shared(n) ? getVar('--ember') : getVar('--paper')) : n.kind === 'morph' ? COLORS[n.lang] : n.kind === 'field' ? getVar('--paper') : n.kind === 'concept' ? (lit(n) ? getVar('--ember') : getVar('--unlit')) : n.community ? getVar('--paper') : COLORS[n.lang])
     .nodeOpacity(0.92)
-    .nodeLabel(n => n.kind === 'word' ? `${esc(n.label)} · ${esc(n.meaning)} (${esc(L[n.lang].name)})` : esc(n.label))
-    .linkColor(l => l.kind === 'colex' ? COLORS[l.lang] : l.kind === 'means' ? COLORS[nodeOf(l.source).lang] : getVar('--rule'))
+    .nodeLabel(n => n.kind === 'lhub' ? esc(n.label) : n.kind === 'gfunc' ? `${esc(n.label)} (${esc(n.gloss)})` : n.kind === 'morph' ? `${esc(n.label)} · ${esc(n.meaning)} (${esc(L[n.lang].name)})` : n.kind === 'word' ? `${esc(n.label)} · ${esc(n.meaning)} (${esc(L[n.lang].name)})` : esc(n.label))
+    .linkColor(l => l.kind === 'gram' ? COLORS[l.lang] : l.kind === 'colex' ? COLORS[l.lang] : l.kind === 'means' ? COLORS[nodeOf(l.source).lang] : getVar('--rule'))
     .linkOpacity(0.35)
     .linkWidth(l => l.kind === 'colex' ? 1.2 : 0)
     .linkDirectionalParticles(l => l.kind === 'colex' ? 3 : 0)
     .linkDirectionalParticleWidth(1.6)
-    .onNodeClick(n => { if (n.kind === 'word') { const t = data.links.find(l => l.kind === 'means' && idOf(l.source) === n.id); if (t) n = nodeOf(t.target); } show(n); focus(n); });
+    .onNodeClick(n => { if (n.kind === 'lhub') return; if (n.kind === 'gfunc' || n.kind === 'morph') { const f = n.kind === 'gfunc' ? n : gById[n.fn]; showGram(f); focus(f); return; } if (n.kind === 'word') { const t = data.links.find(l => l.kind === 'means' && idOf(l.source) === n.id); if (t) n = nodeOf(t.target); } show(n); focus(n); });
 
   function idOf(x){ return typeof x === 'object' ? x.id : x; }
   function nodeOf(x){ return typeof x === 'object' ? x : byId[x]; }
   function lit(c){ return (wordsOf[c.id] || []).some(w => active.has(w.lang)); }
 
+  // grammar layer
+  const GR = data.grammar || {functions: [], items: [], facts: []};
+  const gById = {}, gNodes = GR.functions.map(f => (gById[f.id] = {id: f.id, kind: 'gfunc', label: f.label, gloss: f.gloss, desc: f.desc}));
+  const mNodes = GR.items.map(i => ({id: `m:${i.lang}:${i.form}`, kind: 'morph', lang: i.lang, label: i.form, meaning: i.meaning, evidence: i.checked, note: i.note, fn: 'g:' + i.fn}));
+  function shared(f){ return new Set(mNodes.filter(m => m.fn === f.id && active.has(m.lang)).map(m => m.lang)).size >= 2; }
+  let mode = 'meaning';
+  const note = document.getElementById('stage-note'), noteMeaning = note.textContent;
+  document.querySelectorAll('#mode button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  function setMode(m){
+    if (m === mode) return;
+    mode = m;
+    document.querySelectorAll('#mode button').forEach(b => { b.classList.toggle('on', b.dataset.mode === m); b.setAttribute('aria-pressed', b.dataset.mode === m); });
+    note.textContent = m === 'grammar' ? 'Each language sits on its own hub. Pale nodes are grammar jobs, gold when two or more languages do that job. Small colored nodes are the suffixes and short words that do it, sized by how many cited examples Python confirmed.' : noteMeaning;
+    for (const [, t] of tags) t.remove(); tags.clear();
+    refresh(); setTimeout(() => G.zoomToFit(900, 50), 2200);
+  }
+
   function refresh(){
+    if (mode === 'grammar') {
+      const ms = mNodes.filter(n => active.has(n.lang));
+      const fs = gNodes.filter(f => ms.some(m => m.fn === f.id));
+      const hubs = Object.keys(L).filter(k => active.has(k)).map(k => ({id: 'L:' + k, kind: 'lhub', lang: k, label: L[k].name}));
+      G.graphData({nodes: [...hubs, ...fs, ...ms], links: [...ms.map(m => ({source: m.id, target: m.fn, kind: 'gram', lang: m.lang})), ...ms.map(m => ({source: m.id, target: 'L:' + m.lang, kind: 'gram', lang: m.lang}))]});
+      return;
+    }
     const nodes = data.nodes.filter(n => n.kind !== 'word' || active.has(n.lang));
     const keep = new Set(nodes.map(n => n.id));
     const links = data.links
@@ -240,7 +277,7 @@ function start(data){
   // floating labels for topics and for concepts that have words
   const lab = document.getElementById('labels');
   const tags = new Map();
-  function labelled(){ return G.graphData().nodes.filter(n => n.kind === 'field' || (n.kind === 'concept' && lit(n))); }
+  function labelled(){ return G.graphData().nodes.filter(n => n.kind === 'field' || n.kind === 'gfunc' || n.kind === 'lhub' || (n.kind === 'concept' && lit(n))); }
   function drawLabels(){
     const cam = G.camera(), dir = cam.position.clone(); cam.getWorldDirection(dir);
     const want = new Set();
@@ -251,7 +288,7 @@ function start(data){
       if (front <= 0) continue;
       want.add(n.id);
       let t = tags.get(n.id);
-      if (!t) { t = document.createElement('span'); t.textContent = n.label; if (n.kind === 'field') t.className = 'field'; lab.appendChild(t); tags.set(n.id, t); }
+      if (!t) { t = document.createElement('span'); t.textContent = n.label; if (n.kind === 'field' || n.kind === 'gfunc') t.className = 'field'; lab.appendChild(t); tags.set(n.id, t); }
       const p = G.graph2ScreenCoords(n.x, n.y, n.z);
       t.style.left = p.x + 'px'; t.style.top = p.y + 'px';
       t.style.opacity = Math.max(0.15, Math.min(1, 420 / dist)).toFixed(2);
@@ -289,7 +326,7 @@ function start(data){
     const v = e.target.value.trim().toLowerCase();
     let c = concepts.find(x => x.label === v);
     if (!c) { const w = data.nodes.find(n => n.kind === 'word' && n.label.toLowerCase() === v); const l = w && data.links.find(l => l.kind === 'means' && idOf(l.source) === w.id); if (l) c = nodeOf(l.target); }
-    if (c) { show(c); focus(c); }
+    if (c) { if (mode !== 'meaning') { setMode('meaning'); setTimeout(() => { show(c); focus(c); }, 900); } else { show(c); focus(c); } }
   });
 
   // community: suggest, review, approved words
@@ -347,12 +384,29 @@ function start(data){
     `<div class="bridge"><div class="pair"><span class="sw" style="background:${COLORS[x.a]}"></span>${esc(L[x.a].name)} and <span class="sw" style="background:${COLORS[x.b]}"></span>${esc(L[x.b].name)}<b>${x.shared.length}</b></div>` +
     (x.shared.length ? `<div class="eg">${x.shared.slice(0, 4).map(([c, wa, wb]) => `${esc(c.label)}: <span class="mono">${esc(wa.label)}</span> / <span class="mono">${esc(wb.label)}</span>`).join(' · ')}</div>` : '') + `</div>`).join('');
 
+  function showGram(f){
+    if (!f) return;
+    const ms = mNodes.filter(m => m.fn === f.id && active.has(m.lang));
+    det.innerHTML = `<p style="margin:0 0 6px"><span style="font:400 22px 'Instrument Serif',serif">${esc(f.label)}</span> <span class="mono" style="color:var(--dust)">${esc(f.gloss)} · ${esc(f.desc)}</span></p>` +
+      ms.map(m => `<div class="word"><span class="sw" style="background:${COLORS[m.lang]};margin-top:5px"></span><span class="mono">${esc(m.label)}</span><span>${esc(L[m.lang].name)}, ${m.evidence} example${m.evidence === 1 ? '' : 's'}</span></div>` + (m.note ? `<p class="gnote">${esc(m.note)}</p>` : '')).join('');
+    document.querySelector('.tabs button[data-pane="explore"]').click();
+    det.scrollIntoView({block: 'nearest'});
+  }
+  document.getElementById('facts').innerHTML = GR.facts.map(x => `<div class="fact"><div>${x.langs.map(k => `<span class="sw" style="display:inline-block;background:${COLORS[k]};margin-right:3px"></span>`).join('')} ${esc(x.text)}</div><div class="src">${esc(x.source)}</div></div>`).join('');
+  document.getElementById('gtable').innerHTML = GR.functions.length ?
+    `<tr><th>Job</th>${Object.keys(L).map(k => `<th><span class="sw" style="display:inline-block;background:${COLORS[k]}"></span></th>`).join('')}</tr>` +
+    GR.functions.map(f => `<tr><td><a href="#" data-g="${esc(f.id)}" style="color:var(--paper)">${esc(f.label)}</a></td>${Object.keys(L).map(k => `<td class="mono">${GR.items.filter(i => i.lang === k && 'g:' + i.fn === f.id).map(i => esc(i.form)).join(', ') || '<span style="color:var(--unlit)">·</span>'}</td>`).join('')}</tr>`).join('') : '';
+  document.getElementById('gtable').addEventListener('click', e => { const a = e.target.closest('a[data-g]'); if (!a) return; e.preventDefault(); setMode('grammar'); const f = gById[a.dataset.g]; showGram(f); setTimeout(() => focus(f), 900); });
+  document.getElementById('gmethod').textContent = GR.method || '';
+  if (data.hidden_names) document.getElementById('gmethod').textContent += ` ${data.hidden_names} Pirahã personal names that the model filed under the concept "name" are hidden from the meaning map.`;
+
   // results table: n = 200 per language
   const S = data.summary;
-  const conds = ['zero-shot', 'few-shot', 'rosetta', 'rosetta, cipher'];
+  const HEAD = {'zero-shot': 'zero', 'few-shot': 'few-shot', 'rosetta': 'Rosetta', 'rosetta + examples': '+ examples', 'rosetta, cipher': 'cipher'};
+  const conds = Object.keys(HEAD).filter(c => S.some(x => x.condition === c));
   const get = (lang, cond) => { const r = S.filter(x => x.lang === lang && x.condition === cond && (cond === 'zero-shot' || x.n === 200)); return r.length ? r[0].chrF.toFixed(1) : '·'; };
   document.getElementById('results').innerHTML =
-    `<tr><th>Language</th><th class="num">zero</th><th class="num">few-shot</th><th class="num">Rosetta</th><th class="num">cipher</th></tr>` +
+    `<tr><th>Language</th>${conds.map(c => `<th class="num">${HEAD[c]}</th>`).join('')}</tr>` +
     Object.entries(L).map(([k, v]) => `<tr><td>${esc(v.name)}</td>${conds.map(c => `<td class="num">${get(k, c)}</td>`).join('')}</tr>`).join('');
 
   // coverage table

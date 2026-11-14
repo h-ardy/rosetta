@@ -7,15 +7,11 @@ body:
     attributes:
       value: |
         Thank you for helping. Suggestions are reviewed in public: anyone can vote with a thumbs up or thumbs down, and approved words appear on the map at https://h-ardy.github.io/rosetta/. Please don't include personal information about anyone.
-  - type: dropdown
+  - type: input
     id: language
     attributes:
       label: Language
-      options:
-        - Southern Quechua
-        - Shipibo-Konibo
-        - Pirahã
-        - Other (name it in the notes)
+      description: Southern Quechua, Shipibo-Konibo, Pirahã, or another language.
     validations:
       required: true
   - type: input

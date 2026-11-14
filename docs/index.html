@@ -23,13 +23,39 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--soil);color:var(--paper);font:15px/1.55 "IBM Plex Sans",sans-serif}
 #app{display:grid;grid-template-columns:1fr 380px;height:100vh}
+#left{display:flex;flex-direction:column;min-width:0;min-height:0}
+#bar{padding:18px 28px 16px;border-bottom:1px solid var(--rule);background:var(--soil)}
+#bar .head{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+#bar h1{font:400 40px/1 "Instrument Serif",serif;margin:0}
+#bar .tag{color:var(--dust);font-size:14px;max-width:560px}
+.tr{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:14px;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.tr .side{padding:10px 14px;min-height:110px}
+.tr .side + .side{border-left:1px solid var(--rule);background:var(--soil-2)}
+.tr .lsel{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tr select{background:transparent;border:0;color:var(--paper);font:500 14px "IBM Plex Sans",sans-serif;padding:2px 0;cursor:pointer}
+.tr select:focus{outline:1px solid var(--ember)}
+.tr option{background:var(--soil-2)}
+#swap{background:none;border:1px solid var(--rule);color:var(--dust);border-radius:3px;font:12px "IBM Plex Sans",sans-serif;padding:3px 8px;cursor:pointer;margin-left:auto}
+#swap:hover{color:var(--paper);border-color:var(--dust)}
+#tr-in{width:100%;min-height:62px;resize:vertical;background:transparent;border:0;color:var(--paper);font:18px/1.4 "IBM Plex Sans",sans-serif;padding:0}
+#tr-in:focus{outline:none}
+#tr-out{font:18px/1.4 "IBM Plex Sans",sans-serif;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:flex-start}
+.tok{display:inline-flex;flex-direction:column;cursor:default}
+.tok b{font-weight:400}
+.tok small{font:11px/1.3 "IBM Plex Mono",monospace;color:var(--dust)}
+.tok.unknown b{color:var(--dust);text-decoration:underline dotted}
+.tok.partial b{color:var(--ember)}
+.tok.skip b{color:var(--dust);opacity:.6}
+#tr-note{font-size:12px;color:var(--dust);margin-top:8px}
+#graph{flex:1;min-height:0}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--rule);margin:-4px 0 18px}
+.tabs button{background:none;border:0;color:var(--dust);font:400 22px/1 "Instrument Serif",serif;padding:4px 0 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--paper);border-bottom-color:var(--ember)}
+.pane[hidden]{display:none}
 #graph{position:relative;overflow:hidden}
 #canvas{position:absolute;inset:0}
 #graph canvas{display:block}
 #stage-note{position:absolute;z-index:2;left:28px;bottom:24px;max-width:520px;color:var(--dust);font-size:13px;pointer-events:none}
-#stage-title{position:absolute;z-index:2;left:28px;top:22px;pointer-events:none}
-#stage-title h1{font:400 44px/1 "Instrument Serif",serif;margin:0;letter-spacing:.2px}
-#stage-title p{margin:8px 0 0;color:var(--dust);max-width:460px}
 aside{background:var(--soil-2);border-left:1px solid var(--rule);overflow-y:auto;padding:22px 24px 40px}
 h2{font:400 24px/1.1 "Instrument Serif",serif;margin:26px 0 10px}
 h2:first-child{margin-top:0}
@@ -71,21 +97,41 @@ a{color:var(--paper)}
 .sug{padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
 .sug .votes{float:right;font-family:"IBM Plex Mono",monospace;color:var(--dust)}
 .sug a{color:var(--dust)}
-@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:60vh auto}aside{border-left:0;border-top:1px solid var(--rule)}#stage-title h1{font-size:34px}}
+@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:auto;height:auto}#left{height:auto}#graph{height:60vh;flex:none}aside{border-left:0;border-top:1px solid var(--rule)}.tr{grid-template-columns:1fr}.tr .side + .side{border-left:0;border-top:1px solid var(--rule)}}
 </style>
 </head>
 <body>
 <div id="app">
+  <div id="left">
+  <div id="bar">
+    <div class="head">
+      <h1>Rosetta</h1>
+      <span class="tag">Every language hangs its words off the same everyday concepts, so languages that have never shared a dictionary meet through meaning.</span>
+    </div>
+    <div class="tr" aria-label="Translate through shared concepts">
+      <div class="side">
+        <div class="lsel"><select id="tr-from" aria-label="From language"></select><button id="swap" type="button" aria-label="Swap languages">Swap</button></div>
+        <textarea id="tr-in" placeholder="Type a word or a short phrase" spellcheck="false"></textarea>
+      </div>
+      <div class="side">
+        <div class="lsel"><select id="tr-to" aria-label="To language"></select></div>
+        <div id="tr-out"><span class="empty">The translation appears here, word by word.</span></div>
+      </div>
+    </div>
+    <div id="tr-note">Translates word by word through shared concepts in the dictionaries Rosetta learned, so word order and word endings are not handled. Full sentences are translated in the notebook.</div>
+  </div>
   <section id="graph" aria-label="3D map of concepts and the words each language learned">
     <div id="canvas"></div>
     <div id="labels"></div>
-    <div id="stage-title">
-      <h1>Rosetta</h1>
-      <p>Every language hangs its words off the same everyday concepts, so languages that have never shared a dictionary meet through meaning.</p>
-    </div>
     <div id="stage-note">Drag to turn, scroll to zoom, click a concept to see every word attached to it. Large pale nodes are topics, small nodes are concepts, colored nodes are words learned from 200 example sentences.</div>
   </section>
+  </div>
   <aside>
+    <div class="tabs" role="tablist">
+      <button class="on" role="tab" data-pane="explore" aria-selected="true">Explore</button>
+      <button role="tab" data-pane="contribute" aria-selected="false">Contribute</button>
+    </div>
+    <div class="pane" id="pane-explore">
     <h2>Languages</h2>
     <div id="langs"></div>
 
@@ -94,7 +140,19 @@ a{color:var(--paper)}
     <datalist id="concept-list"></datalist>
     <div id="detail"><p class="empty">Click a concept in the map or search for one.</p></div>
 
-    <h2>Help improve it</h2>
+    <h2>Where languages meet</h2>
+    <p class="empty" style="margin:0 0 6px;font-size:13px">Concepts both languages have a word for, so each word can be traced to the other through meaning.</p>
+    <div id="bridges"></div>
+
+    <h2>How well it translates</h2>
+    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100.</p>
+    <table id="results"></table>
+
+    <h2>Coverage by topic</h2>
+    <table id="coverage"></table>
+
+    </div>
+    <div class="pane" id="pane-contribute" hidden>
     <p class="empty" style="margin:0;font-size:13px">Speak one of these languages? Link a word to a concept. Suggestions are voted on in public, and approved words join the map.</p>
     <div class="form">
       <label for="s-lang">Language</label>
@@ -108,19 +166,7 @@ a{color:var(--paper)}
     <p class="empty" style="font-size:12px;margin:8px 0 0">Opens a public GitHub issue. You need a free GitHub account.</p>
     <div id="review"></div>
 
-    <h2>Where languages meet</h2>
-    <p class="empty" style="margin:0 0 6px;font-size:13px">Concepts both languages have a word for, so each word can be traced to the other through meaning.</p>
-    <div id="bridges"></div>
-
-    <h2>How well it translates</h2>
-    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100.</p>
-    <table id="results"></table>
-
-    <h2>Coverage by topic</h2>
-    <table id="coverage"></table>
-
-    <h2>Real examples</h2>
-    <div id="examples"></div>
+    </div>
 
     <footer>
       Prototype. It does not replace a human interpreter.<br>
@@ -315,14 +361,60 @@ function start(data){
     `<tr><th>Topic</th>${Object.keys(L).map(k => `<th class="num"><span class="sw" style="display:inline-block;background:${COLORS[k]}"></span></th>`).join('')}</tr>` +
     topics.map(t => `<tr><td>${esc(t)}</td>${Object.values(L).map(v => { const r = data.coverage.find(x => x.topic === t && x.language === v.name); return `<td class="num">${r ? Math.round(r.percent) + '%' : '·'}</td>`; }).join('')}</tr>`).join('');
 
-  // examples
-  document.getElementById('examples').innerHTML = data.examples.map(e =>
-    `<div class="ex"><div><span class="sw" style="display:inline-block;background:${COLORS[e.lang]};margin-right:8px"></span>${esc(L[e.lang].name)} <span class="mono" style="color:var(--dust)">chrF ${e.chrf}</span></div>
-      <div><span class="k">source</span>${esc(e.source)}</div>
-      <div><span class="k">Rosetta</span><span class="mono">${esc(e.output)}</span></div>
-      <div><span class="k">correct</span><span class="mono">${esc(e.reference)}</span></div>
-      <div><span class="k">flag</span><span class="${e.flag === 'use' ? 'flag-use' : 'flag-wait'}">${e.flag === 'use' ? 'use' : 'wait for an interpreter'}</span> <span class="mono" style="color:var(--dust)">confidence ${e.confidence}</span></div></div>`).join('');
-  if (data.model) document.getElementById('model').textContent = ` Model: ${data.model}.`;
+  // tabs
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b); });
+    document.querySelectorAll('.pane').forEach(p => p.hidden = p.id !== 'pane-' + b.dataset.pane);
+  }));
+
+  // translator: word by word through shared concepts
+  const NAMES = {english: 'English', ...Object.fromEntries(Object.entries(L).map(([k, v]) => [k, v.name]))};
+  const STOP = new Set('a an the is are was were be to of and or in on at it this that i you he she we they my your his her our their'.split(' '));
+  const clean = t => t.toLowerCase().normalize('NFC').replace(/[^\p{L}\p{N}'\-]+/gu, ' ').trim();
+  const lex = {};   // lang -> list of {form, meaning, evidence}
+  for (const k of Object.keys(L)) {
+    const fromLex = ((data.lexicon || {})[k] || []).map(e => ({form: e.form, meaning: e.meaning_en || '', evidence: e.evidence || 0}));
+    const fromMap = data.nodes.filter(n => n.kind === 'word' && n.lang === k).map(n => ({form: n.label, meaning: n.meaning || '', evidence: n.evidence || 0, community: n.community}));
+    lex[k] = [...fromLex, ...fromMap].filter(e => e.form && !e.form.startsWith('-'));
+  }
+  const headword = m => clean(m).replace(/^(to|a|an|the)\s+/, '').split(' ')[0];
+  function toEnglish(k, tok) {
+    let e = lex[k].find(x => clean(x.form) === tok);
+    if (e) return {en: headword(e.meaning), full: e.meaning, ev: e.evidence, how: 'known'};
+    e = lex[k].filter(x => clean(x.form).length >= 3 && tok.startsWith(clean(x.form))).sort((a, b) => b.form.length - a.form.length)[0];
+    if (e) return {en: headword(e.meaning), full: e.meaning, ev: e.evidence, how: 'partial'};
+    return null;
+  }
+  function fromEnglish(k, en) {
+    const hits = lex[k].filter(x => headword(x.meaning) === en || clean(x.meaning) === en);
+    if (hits.length) { const e = hits.sort((a, b) => b.evidence - a.evidence)[0]; return {form: e.form, ev: e.evidence}; }
+    const c = concepts.find(x => x.label === en || x.label.split(/[ (]/)[0] === en);
+    const w = c && (wordsOf[c.id] || []).find(x => x.lang === k);
+    return w ? {form: w.label, ev: w.evidence} : null;
+  }
+  const fromSel = document.getElementById('tr-from'), toSel = document.getElementById('tr-to'), trIn = document.getElementById('tr-in'), trOut = document.getElementById('tr-out');
+  const opts = Object.entries(NAMES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  fromSel.innerHTML = opts; toSel.innerHTML = opts;
+  fromSel.value = 'english'; toSel.value = Object.keys(L)[0];
+  function translate() {
+    const src = fromSel.value, tgt = toSel.value, toks = clean(trIn.value).split(' ').filter(Boolean);
+    if (!toks.length) { trOut.innerHTML = '<span class="empty">The translation appears here, word by word.</span>'; return; }
+    trOut.innerHTML = toks.map(tok => {
+      if (src === 'english' && STOP.has(tok)) return `<span class="tok skip"><b>${esc(tok)}</b><small>skipped</small></span>`;
+      const en = src === 'english' ? {en: tok, how: 'known'} : toEnglish(src, tok);
+      if (!en) return `<span class="tok unknown" title="Not in the learned dictionary"><b>${esc(tok)}</b><small>unknown</small></span>`;
+      if (tgt === 'english') return `<span class="tok ${en.how}"><b>${esc(en.full || en.en)}</b><small>${esc(tok)}</small></span>`;
+      if (tgt === src) return `<span class="tok"><b>${esc(tok)}</b><small>same language</small></span>`;
+      const out = fromEnglish(tgt, en.en);
+      if (!out) return `<span class="tok unknown" title="No ${esc(NAMES[tgt])} word for this concept yet"><b>[${esc(en.en)}]</b><small>no word yet</small></span>`;
+      return `<span class="tok ${en.how}"><b>${esc(out.form)}</b><small>${esc(en.en)}</small></span>`;
+    }).join('');
+  }
+  trIn.addEventListener('input', translate); fromSel.addEventListener('change', translate); toSel.addEventListener('change', translate);
+  document.getElementById('swap').addEventListener('click', () => { const a = fromSel.value; fromSel.value = toSel.value; toSel.value = a; translate(); });
+
+  if (data.models) document.getElementById('model').textContent = ' Models: ' + Object.entries(data.models).map(([k, m]) => `${L[k] ? L[k].name : k} on ${m}`).join(', ') + '.';
+  else if (data.model) document.getElementById('model').textContent = ` Model: ${data.model}.`;
 }
 </script>
 </body>

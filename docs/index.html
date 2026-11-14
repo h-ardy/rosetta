@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rosetta: languages connected through meaning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --soil:#13120f;      /* page */
+  --soil-2:#1c1b17;    /* panel */
+  --rule:#2f2d27;      /* hairlines */
+  --paper:#efe9dc;     /* main text */
+  --dust:#a39d8f;      /* secondary text */
+  --ember:#e0a458;     /* accent, selection */
+  --quechua:#5b9bd5;
+  --shipibo:#5fb37f;
+  --piraha:#d9784a;
+  --unlit:#4a4740;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--soil);color:var(--paper);font:15px/1.55 "IBM Plex Sans",sans-serif}
+#app{display:grid;grid-template-columns:1fr 380px;height:100vh}
+#graph{position:relative;overflow:hidden}
+#canvas{position:absolute;inset:0}
+#graph canvas{display:block}
+#stage-note{position:absolute;z-index:2;left:28px;bottom:24px;max-width:520px;color:var(--dust);font-size:13px;pointer-events:none}
+#stage-title{position:absolute;z-index:2;left:28px;top:22px;pointer-events:none}
+#stage-title h1{font:400 44px/1 "Instrument Serif",serif;margin:0;letter-spacing:.2px}
+#stage-title p{margin:8px 0 0;color:var(--dust);max-width:460px}
+aside{background:var(--soil-2);border-left:1px solid var(--rule);overflow-y:auto;padding:22px 24px 40px}
+h2{font:400 24px/1.1 "Instrument Serif",serif;margin:26px 0 10px}
+h2:first-child{margin-top:0}
+.lang{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--rule);cursor:pointer;user-select:none}
+.lang input{accent-color:var(--ember);margin:0}
+.sw{width:12px;height:12px;border-radius:2px;flex:none}
+.lang .meta{margin-left:auto;color:var(--dust);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:5px 6px 5px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+th{color:var(--dust);font-weight:400}
+td.num{text-align:right;font-family:"IBM Plex Mono",monospace}
+th.num{text-align:right;white-space:nowrap}
+.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+#search{width:100%;background:var(--soil);border:1px solid var(--rule);color:var(--paper);padding:8px 10px;font:inherit;border-radius:3px}
+#search:focus{outline:1px solid var(--ember)}
+#detail{margin-top:12px;min-height:40px}
+#detail .word{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--rule)}
+#detail .word span:last-child{margin-left:auto;color:var(--dust);font-size:12px}
+.ex{border-top:1px solid var(--rule);padding:10px 0}
+.ex div{margin:2px 0}
+.ex .k{color:var(--dust);font-size:11.5px;display:inline-block;width:74px}
+.flag-use{color:var(--shipibo)}
+.flag-wait{color:var(--ember)}
+.empty{color:var(--dust)}
+footer{color:var(--dust);font-size:12px;margin-top:28px;border-top:1px solid var(--rule);padding-top:12px}
+a{color:var(--paper)}
+@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:60vh auto}aside{border-left:0;border-top:1px solid var(--rule)}#stage-title h1{font-size:34px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="graph" aria-label="3D map of concepts and the words each language learned">
+    <div id="canvas"></div>
+    <div id="stage-title">
+      <h1>Rosetta</h1>
+      <p>Every language hangs its words off the same everyday concepts, so languages that have never shared a dictionary meet through meaning.</p>
+    </div>
+    <div id="stage-note">Drag to turn, scroll to zoom, click a concept to see every word attached to it. Large pale nodes are topics, small nodes are concepts, colored nodes are words learned from 200 example sentences.</div>
+  </section>
+  <aside>
+    <h2>Languages</h2>
+    <div id="langs"></div>
+
+    <h2>Find a concept</h2>
+    <input id="search" list="concept-list" placeholder="water, hand, sick, mother" autocomplete="off">
+    <datalist id="concept-list"></datalist>
+    <div id="detail"><p class="empty">Click a concept in the map or search for one.</p></div>
+
+    <h2>How well it translates</h2>
+    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100.</p>
+    <table id="results"></table>
+
+    <h2>Coverage by topic</h2>
+    <table id="coverage"></table>
+
+    <h2>Real examples</h2>
+    <div id="examples"></div>
+
+    <footer>
+      Prototype. It does not replace a human interpreter.<br>
+      Data: AmericasNLP 2021, MIT Pirahã Corpus (CC BY-SA), Concepticon. Built for the Veritas AI High School Hackathon 2026.
+      <span id="model"></span>
+    </footer>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.2/dist/3d-force-graph.min.js"></script>
+<script>
+const COLORS = {quechua: getVar('--quechua'), shipibo: getVar('--shipibo'), piraha: getVar('--piraha')};
+function getVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+fetch('graph.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(start)
+  .catch(() => { document.getElementById('detail').innerHTML = '<p class="empty">graph.json not found. Run the notebook and upload outputs/graph.json next to this page.</p>'; });
+
+function start(data){
+  const L = data.languages;
+  const active = new Set(Object.keys(L));
+  const byId = Object.fromEntries(data.nodes.map(n => [n.id, n]));
+  const wordsOf = {};  // concept id -> word nodes
+  data.links.filter(l => l.kind === 'means').forEach(l => { (wordsOf[l.target] ||= []).push(byId[l.source]); });
+
+  // language toggles
+  const langsEl = document.getElementById('langs');
+  Object.entries(L).forEach(([k, v]) => {
+    const n = data.nodes.filter(x => x.kind === 'word' && x.lang === k).length;
+    const row = document.createElement('label');
+    row.className = 'lang';
+    row.innerHTML = `<input type="checkbox" checked data-lang="${k}"><span class="sw" style="background:${COLORS[k]}"></span><span>${esc(v.name)}<br><small style="color:var(--dust)">${esc(v.region)}, from ${esc(v.src)}</small></span><span class="meta">${n} word${n === 1 ? '' : 's'}</span>`;
+    row.querySelector('input').addEventListener('change', e => { e.target.checked ? active.add(k) : active.delete(k); refresh(); });
+    langsEl.appendChild(row);
+  });
+
+  // graph
+  const el = document.getElementById('canvas');
+  const G = ForceGraph3D()(el)
+    .backgroundColor(getVar('--soil'))
+    .width(el.clientWidth).height(el.clientHeight)
+    .nodeId('id')
+    .nodeVal(n => n.kind === 'field' ? 14 : n.kind === 'concept' ? (wordsOf[n.id] ? 2.4 : 1) : 1 + Math.min(n.evidence || 0, 6) * 0.25)
+    .nodeColor(n => n.kind === 'field' ? getVar('--paper') : n.kind === 'concept' ? (lit(n) ? getVar('--ember') : getVar('--unlit')) : COLORS[n.lang])
+    .nodeOpacity(0.92)
+    .nodeLabel(n => n.kind === 'word' ? `${esc(n.label)} · ${esc(n.meaning)} (${esc(L[n.lang].name)})` : esc(n.label))
+    .linkColor(l => l.kind === 'colex' ? COLORS[l.lang] : l.kind === 'means' ? COLORS[nodeOf(l.source).lang] : getVar('--rule'))
+    .linkOpacity(0.35)
+    .linkWidth(l => l.kind === 'colex' ? 1.2 : 0)
+    .linkDirectionalParticles(l => l.kind === 'colex' ? 3 : 0)
+    .linkDirectionalParticleWidth(1.6)
+    .onNodeClick(n => { if (n.kind === 'word') { const t = data.links.find(l => l.kind === 'means' && idOf(l.source) === n.id); if (t) n = nodeOf(t.target); } show(n); focus(n); });
+
+  function idOf(x){ return typeof x === 'object' ? x.id : x; }
+  function nodeOf(x){ return typeof x === 'object' ? x : byId[x]; }
+  function lit(c){ return (wordsOf[c.id] || []).some(w => active.has(w.lang)); }
+
+  function refresh(){
+    const nodes = data.nodes.filter(n => n.kind !== 'word' || active.has(n.lang));
+    const keep = new Set(nodes.map(n => n.id));
+    const links = data.links
+      .filter(l => keep.has(idOf(l.source)) && keep.has(idOf(l.target)) && (l.kind !== 'colex' || active.has(l.lang)))
+      .map(l => ({...l, source: idOf(l.source), target: idOf(l.target)}));
+    G.graphData({nodes, links});
+  }
+  refresh();
+  window.addEventListener('resize', () => G.width(el.clientWidth).height(el.clientHeight));
+
+  function focus(n){
+    if (n.x === undefined) return;
+    const d = 90, r = 1 + d / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
+    G.cameraPosition({x: n.x * r, y: n.y * r, z: n.z * r}, n, 1200);
+  }
+
+  // concept detail
+  const det = document.getElementById('detail');
+  function show(c){
+    if (!c || c.kind === 'field') { if (c) det.innerHTML = `<p><strong>${esc(c.label)}</strong></p>`; return; }
+    const ws = (wordsOf[c.id] || []).filter(w => active.has(w.lang));
+    const colex = data.links.filter(l => l.kind === 'colex' && active.has(l.lang) && (idOf(l.source) === c.id || idOf(l.target) === c.id));
+    det.innerHTML = `<p style="margin:0 0 6px"><span style="font:400 22px 'Instrument Serif',serif">${esc(c.label)}</span> <span class="mono" style="color:var(--dust)">Concepticon ${esc(c.cid)} · ${esc(c.field)}</span></p>` +
+      (ws.length ? ws.map(w => `<div class="word"><span class="sw" style="background:${COLORS[w.lang]};margin-top:5px"></span><span class="mono">${esc(w.label)}</span><span>${esc(L[w.lang].name)}, ${w.evidence} example${w.evidence === 1 ? '' : 's'}</span></div>`).join('')
+                 : '<p class="empty">No language has a word for this yet. It is a gap to fill with more examples.</p>') +
+      colex.map(l => { const o = nodeOf(idOf(l.source) === c.id ? l.target : l.source); return `<p class="empty" style="margin:8px 0 0;font-size:13px">${esc(L[l.lang].name)} uses <span class="mono">${esc(l.form)}</span> for both ${esc(c.label)} and ${esc(o.label)}.</p>`; }).join('');
+  }
+
+  // search
+  const dl = document.getElementById('concept-list');
+  const concepts = data.nodes.filter(n => n.kind === 'concept');
+  dl.innerHTML = concepts.map(c => `<option value="${esc(c.label)}">`).join('');
+  document.getElementById('search').addEventListener('change', e => {
+    const c = concepts.find(x => x.label === e.target.value.trim().toLowerCase());
+    if (c) { show(c); focus(c); }
+  });
+
+  // results table: n = 200 per language
+  const S = data.summary;
+  const conds = ['zero-shot', 'few-shot', 'rosetta', 'rosetta, cipher'];
+  const get = (lang, cond) => { const r = S.filter(x => x.lang === lang && x.condition === cond && (cond === 'zero-shot' || x.n === 200)); return r.length ? r[0].chrF.toFixed(1) : '·'; };
+  document.getElementById('results').innerHTML =
+    `<tr><th>Language</th><th class="num">zero</th><th class="num">few-shot</th><th class="num">Rosetta</th><th class="num">cipher</th></tr>` +
+    Object.entries(L).map(([k, v]) => `<tr><td>${esc(v.name)}</td>${conds.map(c => `<td class="num">${get(k, c)}</td>`).join('')}</tr>`).join('');
+
+  // coverage table
+  const topics = [...new Set(data.coverage.map(r => r.topic))].sort();
+  document.getElementById('coverage').innerHTML =
+    `<tr><th>Topic</th>${Object.keys(L).map(k => `<th class="num"><span class="sw" style="display:inline-block;background:${COLORS[k]}"></span></th>`).join('')}</tr>` +
+    topics.map(t => `<tr><td>${esc(t)}</td>${Object.values(L).map(v => { const r = data.coverage.find(x => x.topic === t && x.language === v.name); return `<td class="num">${r ? Math.round(r.percent) + '%' : '·'}</td>`; }).join('')}</tr>`).join('');
+
+  // examples
+  document.getElementById('examples').innerHTML = data.examples.map(e =>
+    `<div class="ex"><div><span class="sw" style="display:inline-block;background:${COLORS[e.lang]};margin-right:8px"></span>${esc(L[e.lang].name)} <span class="mono" style="color:var(--dust)">chrF ${e.chrf}</span></div>
+      <div><span class="k">source</span>${esc(e.source)}</div>
+      <div><span class="k">Rosetta</span><span class="mono">${esc(e.output)}</span></div>
+      <div><span class="k">correct</span><span class="mono">${esc(e.reference)}</span></div>
+      <div><span class="k">flag</span><span class="${e.flag === 'use' ? 'flag-use' : 'flag-wait'}">${e.flag === 'use' ? 'use' : 'wait for an interpreter'}</span> <span class="mono" style="color:var(--dust)">confidence ${e.confidence}</span></div></div>`).join('');
+  if (data.model) document.getElementById('model').textContent = ` Model: ${data.model}.`;
+}
+</script>
+</body>
+</html>

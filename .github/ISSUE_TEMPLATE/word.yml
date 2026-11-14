@@ -1,0 +1,49 @@
+name: Suggest a word
+description: Link a word in your language to a concept on the Rosetta map.
+title: "[word] "
+labels: ["suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping. Suggestions are reviewed in public: anyone can vote with a thumbs up or thumbs down, and approved words appear on the map at https://h-ardy.github.io/rosetta/. Please don't include personal information about anyone.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Southern Quechua
+        - Shipibo-Konibo
+        - Pirahã
+        - Other (name it in the notes)
+    validations:
+      required: true
+  - type: input
+    id: concept
+    attributes:
+      label: Concept or English meaning
+      description: For example water, mother, pain.
+    validations:
+      required: true
+  - type: input
+    id: word
+    attributes:
+      label: Word in the language
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example sentence and translation (optional)
+  - type: dropdown
+    id: speaker
+    attributes:
+      label: How do you know this word?
+      options:
+        - I speak this language
+        - I am learning this language
+        - From a dictionary or other source (name it in the notes)
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)

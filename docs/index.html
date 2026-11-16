@@ -158,7 +158,7 @@ a{color:var(--paper)}
     <p class="gnote" id="gmethod"></p>
 
     <h2>How well it translates</h2>
-    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100. Zero: no examples. Few-shot: the 200 examples pasted into the prompt. Rosetta: only the dictionary it learned. Cipher: Rosetta on Quechua with every letter swapped.</p>
+    <p class="empty" style="margin:0 0 8px;font-size:13px">chrF on 50 unseen test sentences per language, from 200 examples. Higher is better, 0 to 100. Zero: no examples. Few-shot: the 200 examples pasted into the prompt. Rosetta: only the dictionary it learned. + examples: the dictionary and the 200 examples together, with a gloss and a confidence score. Cipher: Rosetta on Quechua with every letter swapped. Few-shot and + examples ran on gemini-3.6-flash for all three languages; the other columns come from the first run.</p>
     <table id="results"></table>
 
     <h2>Coverage by topic</h2>

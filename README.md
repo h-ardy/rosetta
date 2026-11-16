@@ -46,7 +46,19 @@ The free tier allows about 20 requests per model per day, so each language ran o
 
 Translating only through the learned dictionary loses to pasting the examples in, because Rosetta leaves words it has no evidence for untranslated. The cipher test scored 11.4 against 20.6 on real Quechua, so part of the Quechua score comes from what the model already knew. The confidence flag cleared 4 of 150 translations and sent the rest to an interpreter.
 
-**Second run (Rosetta + examples).** The last notebook cell gives the translator the 200 examples as well as the dictionary, runs every language on one model, and reruns few-shot on that model for a fair comparison. It uses `data/dictionaries_200.json`, the dictionaries from the first run.
+## Results (second run: dictionary plus examples)
+
+The second-run cell gives the translator the 200 examples as well as the dictionary, runs every language on gemini-3.6-flash, and reruns few-shot on that model for a fair comparison. It uses `data/dictionaries_200.json`, the dictionaries from the first run.
+
+| Language | Few-shot | Rosetta + examples |
+| --- | --- | --- |
+| Southern Quechua | 51.3 | 48.2 |
+| Shipibo-Konibo | 44.8 | 44.5 |
+| Pirahã | 42.2 | 42.2 |
+
+Rosetta matches the plain prompt within a point on two languages and trails by 3.1 on Quechua, and every translation comes with a word-by-word gloss and a confidence score. Inside each language, sentences the flag marked "use" scored higher than those marked "wait for interpreter" (Quechua 53.1 vs 48.0, Shipibo-Konibo 49.6 vs 43.1, Pirahã 40.2 vs 36.1). Pooled across languages the gap disappears, so the cutoff needs setting per language.
+
+Pirahã dictionary check: 83 of the 111 learned words appear in the corpus word list, and for 55 of them (66%) the learned English meaning shares a word with the linguists' gloss.
 
 ## Run it
 

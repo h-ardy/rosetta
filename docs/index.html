@@ -57,7 +57,20 @@ html,body{margin:0;height:100%;background:var(--soil);color:var(--paper);font:15
 .tabs button{background:none;border:0;color:var(--dust);font:800 22px/1 var(--dot);padding:4px 0 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button.on{color:var(--paper);border-bottom-color:var(--lime2)}
 .pane[hidden]{display:none}
-#graph{position:relative;overflow:hidden}
+#graph{position:relative;overflow:hidden;
+  --paper:#e9f0ea;--dust:#93a69a;--soil:#05080a;--unlit:#3a4840;--rule:#2a3530;
+  --quechua:#6aa8e6;--shipibo:#5fc489;--piraha:#ec8a55;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1px 1px at 68% 9%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1.2px 1.2px at 84% 44%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1px 1px at 37% 72%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(1px 1px at 55% 33%, rgba(255,255,255,.4), transparent 60%),
+    radial-gradient(1.3px 1.3px at 22% 88%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1px 1px at 93% 81%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(60% 55% at 28% 22%, rgba(110,160,60,.20), transparent 70%),
+    radial-gradient(50% 50% at 82% 88%, rgba(60,90,160,.22), transparent 70%),
+    linear-gradient(180deg,#04060a 0%,#070c0b 55%,#0b120e 100%)}
 #canvas{position:absolute;inset:0}
 #graph canvas{display:block}
 #stage-note{position:absolute;z-index:2;left:28px;bottom:24px;max-width:520px;color:var(--dust);font-size:13px;pointer-events:none}
@@ -94,8 +107,8 @@ a{color:var(--paper)}
 .fact .src{color:var(--dust);font-size:11.5px;margin-top:3px}
 .gnote{font-size:13px;color:var(--dust);margin:8px 0 0}
 #labels{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}
-#labels span{position:absolute;transform:translate(-50%,-140%);font:12px/1 "IBM Plex Sans",sans-serif;color:var(--paper);white-space:nowrap;text-shadow:0 0 4px var(--soil),0 0 2px var(--soil)}
-#labels span.field{font:800 16px/1 var(--dot);color:#33473a}
+#labels span{position:absolute;transform:translate(-50%,-140%);font:500 12.5px/1 "IBM Plex Sans",sans-serif;color:#fff;white-space:nowrap;text-shadow:0 0 4px var(--soil),0 0 2px var(--soil)}
+#labels span.field{font:900 17px/1 var(--dot);color:#d8f59a}
 .bridge{padding:7px 0;border-bottom:1px solid var(--rule);font-size:13px}
 .bridge .pair{display:flex;align-items:center;gap:6px}
 .bridge .pair b{font-weight:500;margin-left:auto;font-family:"IBM Plex Mono",monospace}
@@ -137,7 +150,7 @@ a{color:var(--paper)}
     <div id="canvas"></div>
     <div id="mode" role="group" aria-label="Map"><button class="on" data-mode="meaning" aria-pressed="true">Meaning</button><button data-mode="grammar" aria-pressed="false">Grammar</button></div>
     <div id="labels"></div>
-    <div id="stage-note">Drag to turn, scroll to zoom, click a concept to see every word attached to it. Large dark nodes are topics, small nodes are concepts (lime once a language has a word for them), colored nodes are words learned from 200 example sentences.</div>
+    <div id="stage-note">Drag to turn, scroll to zoom, click a concept to see every word attached to it. Large pale nodes are topics, small nodes are concepts (lime once a language has a word for them), colored nodes are words learned from 200 example sentences.</div>
   </section>
   </div>
   <aside>
@@ -199,7 +212,7 @@ a{color:var(--paper)}
 <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.2/dist/3d-force-graph.min.js"></script>
 <script>
 const COLORS = {quechua: getVar('--quechua'), shipibo: getVar('--shipibo'), piraha: getVar('--piraha')};
-function getVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function getVar(n){ const el = document.getElementById('graph') || document.documentElement; return getComputedStyle(el).getPropertyValue(n).trim(); }
 function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 fetch('graph.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -227,7 +240,7 @@ function start(data){
   // graph
   const el = document.getElementById('canvas');
   const G = ForceGraph3D({controlType: 'orbit'})(el)
-    .backgroundColor(getVar('--soil'))
+    .backgroundColor('rgba(0,0,0,0)')
     .width(el.clientWidth).height(el.clientHeight)
     .nodeId('id')
     .nodeVal(n => n.kind === 'lhub' ? 12 : n.kind === 'gfunc' ? (shared(n) ? 7 : 4) : n.kind === 'morph' ? 1 + Math.min(n.evidence || 0, 8) * 0.3 : n.kind === 'field' ? 14 : n.kind === 'concept' ? (wordsOf[n.id] ? 2.4 : 1) : 1 + Math.min(n.evidence || 0, 6) * 0.25)
@@ -257,7 +270,7 @@ function start(data){
     if (m === mode) return;
     mode = m;
     document.querySelectorAll('#mode button').forEach(b => { b.classList.toggle('on', b.dataset.mode === m); b.setAttribute('aria-pressed', b.dataset.mode === m); });
-    note.textContent = m === 'grammar' ? 'Each language sits on its own hub. Dark nodes are grammar jobs, lime when two or more languages do that job. Small colored nodes are the suffixes and short words that do it, sized by how many cited examples Python confirmed.' : noteMeaning;
+    note.textContent = m === 'grammar' ? 'Each language sits on its own hub. Pale nodes are grammar jobs, lime when two or more languages do that job. Small colored nodes are the suffixes and short words that do it, sized by how many cited examples Python confirmed.' : noteMeaning;
     for (const [, t] of tags) t.remove(); tags.clear();
     refresh(); setTimeout(() => G.zoomToFit(900, 50), 2200);
   }
@@ -298,7 +311,7 @@ function start(data){
       if (!t) { t = document.createElement('span'); t.textContent = n.label; if (n.kind === 'field' || n.kind === 'gfunc') t.className = 'field'; lab.appendChild(t); tags.set(n.id, t); }
       const p = G.graph2ScreenCoords(n.x, n.y, n.z);
       t.style.left = p.x + 'px'; t.style.top = p.y + 'px';
-      t.style.opacity = Math.max(0.15, Math.min(1, 420 / dist)).toFixed(2);
+      t.style.opacity = Math.max(0.55, Math.min(1, 700 / dist)).toFixed(2);
     }
     for (const [id, t] of tags) if (!want.has(id)) { t.remove(); tags.delete(id); }
     requestAnimationFrame(drawLabels);
